@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>El misterio de Halloween | Rompecabezas</title>
+<style>
+:root{--ink:#28213d;--purple:#5b3b87;--gold:#f5b942;--cream:#fff9ed}
+*{box-sizing:border-box}
+body{margin:0;background:linear-gradient(135deg,#211b38,#49316c 55%,#211b38);font-family:system-ui,Segoe UI,Arial,sans-serif;color:var(--ink);padding:18px}
+.wrap{max-width:1050px;margin:auto;background:var(--cream);border-radius:22px;overflow:hidden;box-shadow:0 18px 50px #100b2080}
+header{text-align:center;padding:22px 16px 16px;background:linear-gradient(120deg,#382653,#68469a);color:white}
+.kicker{letter-spacing:.16em;font-weight:800;font-size:.78rem;color:#ffd77d}
+h1{margin:6px 0;font-size:clamp(1.65rem,4vw,2.5rem)}
+header p{margin:5px 0 0;color:#f2eaff}
+main{padding:18px}
+.instructions{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+.instructions p{margin:0;line-height:1.45}
+.pill{background:#f4e9ff;border:1px solid #ddc8f3;padding:8px 12px;border-radius:999px;font-weight:800;color:#55327c}
+#game{width:100%;overflow:auto;border-radius:14px;background:#eee7f5;border:2px solid #d7c7e7}
+canvas{display:block;width:100%;height:auto;touch-action:none;cursor:grab}
+canvas:active{cursor:grabbing}
+.controls{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin:14px 0}
+button{border:0;border-radius:12px;padding:11px 17px;font-weight:800;font-size:1rem;cursor:pointer;background:#5b3b87;color:white}
+button.secondary{background:#f1e5ff;color:#4c2e70;border:1px solid #d7c3ec}
+button:focus-visible{outline:3px solid #e2a72e;outline-offset:3px}
+#status{text-align:center;font-weight:800;min-height:28px;color:#513078}
+#win{display:none;text-align:center;margin:10px auto 2px;padding:16px;border-radius:16px;background:#fff0c8;border:2px solid #efc15c;color:#4c3263;font-size:1.15rem;font-weight:900}
+footer{text-align:center;color:#6d6178;font-size:.82rem;padding:0 16px 18px}
+@media(max-width:600px){body{padding:7px}main{padding:10px}.instructions{align-items:flex-start}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+<div class="kicker">RETO PARA 5.º DE PRIMARIA</div>
+<h1>🎃 El misterio de Halloween 🧩</h1>
+<p>¡Reconstruye la imagen pieza por pieza!</p>
+</header>
+<main>
+<div class="instructions">
+<p><strong>¿Cómo se juega?</strong> Arrastra cada pieza hasta el lugar que le corresponde en el tablero. Si está cerca de su sitio, ¡encajará!</p>
+<span class="pill">50 piezas</span>
+</div>
+<div id="game"><canvas id="puzzle" width="1000" height="850" aria-label="Rompecabezas interactivo de 50 piezas"></canvas></div>
+<div class="controls">
+<button id="shuffle">Mezclar de nuevo</button>
+<button class="secondary" id="show">Ver imagen completa</button>
+</div>
+<div id="status" role="status" aria-live="polite">¡Tú puedes resolverlo! Busca primero las piezas de las esquinas.</div>
+<div id="win">✨ ¡Felicidades! ¡Has resuelto el misterio de Halloween! ✨</div>
+</main>
+<footer>Instituto Alianza A.C. · Actividad interactiva</footer>
+</div>
+<script>
+(() => {
+const canvas=document.getElementById('puzzle'), ctx=canvas.getContext('2d');
+const W=1000,H=850, cols=10,rows=5, cell=80, boardX=100,boardY=35, boardW=800,boardH=400;
+const trayY=475, snap=24;
+const status=document.getElementById('status'), win=document.getElementById('win');
+const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="800" height="400" viewBox="0 0 800 400">
+<defs>
+<linearGradient id="sky" x2="0" y2="1"><stop stop-color="#171b46"/><stop offset="1" stop-color="#693d83"/></linearGradient>
+<linearGradient id="house" x2="0" y2="1"><stop stop-color="#56446f"/><stop offset="1" stop-color="#211d38"/></linearGradient>
+<radialGradient id="moon"><stop stop-color="#fff9c8"/><stop offset="1" stop-color="#f5c85d"/></radialGradient>
+</defs>
+<rect width="800" height="400" fill="url(#sky)"/>
+<circle cx="650" cy="95" r="57" fill="url(#moon)"/>
+<g fill="#fff3c4"><circle cx="90" cy="55" r="3"/><circle cx="190" cy="90" r="2"/><circle cx="330" cy="40" r="3"/><circle cx="470" cy="75" r="2"/><circle cx="745" cy="40" r="3"/><circle cx="570" cy="25" r="2"/></g>
+<path d="M0 330 Q130 280 250 330 T500 320 T800 315 V400 H0Z" fill="#25213d"/>
+<path d="M170 330 V165 L270 95 L370 165 V330Z" fill="url(#house)" stroke="#17152b" stroke-width="8"/>
+<path d="M145 170 L270 75 L395 170Z" fill="#2a213e" stroke="#17152b" stroke-width="8"/>
+<path d="M225 330 V245 Q270 195 315 245 V330Z" fill="#15152c" stroke="#100f20" stroke-width="7"/>
+<g fill="#ffbd4a" stroke="#f68c31" stroke-width="4"><rect x="195" y="190" width="42" height="50" rx="5"/><rect x="303" y="190" width="42" height="50" rx="5"/></g>
+<g stroke="#493052" stroke-width="5"><path d="M216 190v50m-21-25h42M324 190v50m-21-25h42"/></g>
+<path d="M480 330 Q470 250 500 200 Q520 245 530 330" fill="#191c32"/>
+<path d="M500 245 Q440 205 450 165 Q490 175 510 220 Q515 175 555 150 Q570 205 520 245" fill="#191c32"/>
+<g transform="translate(90 320)"><path d="M-40 20 Q-45-35 0-42 Q45-35 40 20Z" fill="#f58b26"/><path d="M0-42q-10-18 4-26" stroke="#547b3a" stroke-width="8" fill="none"/><path d="M-22-10l12 10-12 10m44-20L10 0l12 10" stroke="#34203c" stroke-width="7" fill="none"/><path d="M-12 22q12 12 24 0" stroke="#34203c" stroke-width="6" fill="none"/></g>
+<g transform="translate(690 335) scale(1.15)"><path d="M-40 20 Q-45-35 0-42 Q45-35 40 20Z" fill="#f58b26"/><path d="M0-42q-10-18 4-26" stroke="#547b3a" stroke-width="8" fill="none"/><path d="M-22-10l12 10-12 10m44-20L10 0l12 10" stroke="#34203c" stroke-width="7" fill="none"/><path d="M-12 22q12 12 24 0" stroke="#34203c" stroke-width="6" fill="none"/></g>
+<g fill="#101326"><path d="M550 130q-30-40-60 0q30-8 30 20q0-28 30-20z"/><path d="M95 155q-24-32-48 0q24-6 24 16q0-22 24-16z"/></g>
+<g fill="#d6b7ef" font-family="sans-serif" font-size="22" font-weight="bold"><text x="400" y="375" text-anchor="middle">LA MANSIÓN DEL MISTERIO</text></g>
+</svg>`;
+const img=new Image(); img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
+let pieces=[],drag=null,showFull=false,complete=false;
+function edge(type,sign){ // edge segment across one cell
+ if(type===0)return `L ${cell} 0`;
+ const s=sign;
+ return `L ${cell*.34} 0 C ${cell*.30} ${-s*18} ${cell*.38} ${-s*24} ${cell*.5} ${-s*24} C ${cell*.62} ${-s*24} ${cell*.70} ${-s*18} ${cell*.66} 0 L ${cell} 0`;
+}
+function pathFor(r,c){
+ const top=(r===0?0:((r+c)%2?1:-1));
+ const right=(c===cols-1?0:((r+c+1)%2?1:-1));
+ const bottom=(r===rows-1?0:-top);
+ const left=(c===0?0:-right);
+ let d=`M 0 0`;
+ // top edge
+ if(top===0)d+=` L ${cell} 0`; else d+=` L 27 0 C 24 ${-top*18} 34 ${-top*24} 40 ${-top*24} C 53 ${-top*24} 58 ${-top*18} 53 0 L ${cell} 0`;
+ // right
+ if(right===0)d+=` L ${cell} ${cell}`; else d+=` L ${cell} 27 C ${cell+right*18} 24 ${cell+right*24} 34 ${cell+right*24} 40 C ${cell+right*24} 53 ${cell+right*18} 58 ${cell} 53 L ${cell} ${cell}`;
+ // bottom
+ if(bottom===0)d+=` L 0 ${cell}`; else d+=` L 53 ${cell} C 58 ${cell+bottom*18} 53 ${cell+bottom*24} 40 ${cell+bottom*24} C 34 ${cell+bottom*24} 24 ${cell+bottom*18} 27 ${cell} L 0 ${cell}`;
+ // left
+ if(left===0)d+=' Z'; else d+=` L 0 53 C ${-left*18} 58 ${-left*24} 53 ${-left*24} 40 C ${-left*24} 34 ${-left*18} 24 0 27 Z`;
+ return d;
+}
+function shuffle(){
+ pieces=[];
+ for(let r=0;r<rows;r++)for(let c=0;c<cols;c++){
+  let x=20+(c%10)*95+Math.random()*8, y=trayY+Math.floor(Math.random()*5)*68+Math.random()*6;
+  pieces.push({r,c,x,y,tx:boardX+c*cell,ty:boardY+r*cell,placed:false,path:pathFor(r,c)});
+ }
+ complete=false;win.style.display='none';status.textContent='¡Tú puedes resolverlo! Busca primero las piezas de las esquinas.';draw();
+}
+function drawPiece(p){
+ ctx.save();ctx.translate(p.x,p.y);
+ const path=new Path2D(p.path);
+ ctx.save();ctx.clip(path);
+ // Draw the original illustration at the correct relative offset
+ ctx.drawImage(img,-p.c*cell,-p.r*cell,boardW,boardH);
+ ctx.restore();
+ ctx.strokeStyle='#fff3d2';ctx.lineWidth=2;ctx.stroke(path);
+ ctx.strokeStyle='#38264f';ctx.lineWidth=1;ctx.stroke(path);
+ ctx.restore();
+}
+function draw(){
+ ctx.clearRect(0,0,W,H);
+ ctx.fillStyle='#eee7f5';ctx.fillRect(0,0,W,H);
+ ctx.fillStyle='#d7c6e8';ctx.fillRect(boardX-5,boardY-5,boardW+10,boardH+10);
+ ctx.fillStyle='#fff';ctx.fillRect(boardX,boardY,boardW,boardH);
+ if(img.complete&&img.naturalWidth){
+  ctx.globalAlpha=.16;ctx.drawImage(img,boardX,boardY,boardW,boardH);ctx.globalAlpha=1;
+ }
+ ctx.strokeStyle='#b7a4ca';ctx.lineWidth=1;
+ for(let c=0;c<=cols;c++){ctx.beginPath();ctx.moveTo(boardX+c*cell,boardY);ctx.lineTo(boardX+c*cell,boardY+boardH);ctx.stroke()}
+ for(let r=0;r<=rows;r++){ctx.beginPath();ctx.moveTo(boardX,boardY+r*cell);ctx.lineTo(boardX+boardW,boardY+r*cell);ctx.stroke()}
+ ctx.fillStyle='#5b3b87';ctx.font='bold 18px system-ui';ctx.fillText('TABLERO',boardX,boardY-12);
+ ctx.fillText('PIEZAS',20,trayY-12);
+ ctx.fillStyle='#dfd5e8';ctx.fillRect(12,trayY,976,350);
+ pieces.filter(p=>p.placed).forEach(drawPiece);
+ if(drag)drawPiece(drag);
+ pieces.filter(p=>!p.placed&&p!==drag).forEach(drawPiece);
+ if(showFull&&img.complete){ctx.fillStyle='#251b3a';ctx.fillRect(650,760,330,75);ctx.drawImage(img,660,768,310,59)}
+}
+function pos(e){const b=canvas.getBoundingClientRect();return{x:(e.clientX-b.left)*W/b.width,y:(e.clientY-b.top)*H/b.height}}
+canvas.addEventListener('pointerdown',e=>{
+ const q=pos(e);let p=[...pieces].reverse().find(p=>!p.placed&&q.x>=p.x-10&&q.x<=p.x+cell+28&&q.y>=p.y-10&&q.y<=p.y+cell+28);
+ if(!p)return;drag=p;drag.ox=q.x-p.x;drag.oy=q.y-p.y;canvas.setPointerCapture(e.pointerId);draw();
+});
+canvas.addEventListener('pointermove',e=>{if(!drag)return;const q=pos(e);drag.x=q.x-drag.ox;drag.y=q.y-drag.oy;draw()});
+canvas.addEventListener('pointerup',()=>{
+ if(!drag)return;
+ if(Math.abs(drag.x-drag.tx)<snap&&Math.abs(drag.y-drag.ty)<snap){
+  drag.x=drag.tx;drag.y=drag.ty;drag.placed=true;
+  const n=pieces.filter(p=>p.placed).length;
+  status.textContent=`¡Muy bien! Llevas ${n} de 50 piezas.`;
+  if(n===50){complete=true;status.textContent='¡Lo lograste!';win.style.display='block'}
+ } else status.textContent='Sigue intentando. Busca el lugar que corresponde a esa parte de la imagen.';
+ drag=null;draw();
+});
+document.getElementById('shuffle').addEventListener('click',shuffle);
+document.getElementById('show').addEventListener('click',()=>{showFull=!showFull;document.getElementById('show').textContent=showFull?'Ocultar imagen':'Ver imagen completa';draw()});
+img.onload=()=>{shuffle()};
+})();
+</script>
+</body>
+</html>
